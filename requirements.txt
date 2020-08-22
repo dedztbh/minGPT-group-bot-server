@@ -2,3 +2,4 @@ torch
 tornado
 jieba
 numpy
+tqdm
