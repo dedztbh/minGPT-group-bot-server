@@ -1,7 +1,7 @@
 # minGPT-group-bot-server
 q q 群 暴 论 b o t
 
-简单几步训练你群专属的暴论人工能智(zhang)！
+简单几步训练你群专属的暴论人工智能(zhang)！
 
 步骤：
 1. 从QQ到处txt格式的聊天记录，重命名为qbqljl.txt
