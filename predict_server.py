@@ -1,5 +1,6 @@
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import tornado.ioloop
+import tornado.web
 import sys
 
 import numpy as np
@@ -124,30 +125,19 @@ def predict(msgs, cnt=32, input_skip_unk=False, first_sentence=False):
     return completion, all_probs
 
 
-class S(BaseHTTPRequestHandler):
-    def _set_headers(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-
-    def do_HEAD(self):
-        self._set_headers()
-
-    def do_POST(self):
-        self._set_headers()
-        data_string = self.rfile.read(int(self.headers['Content-Length']))
-
-        self.send_response(200)
-        self.end_headers()
-
+class MainHandler(tornado.web.RequestHandler):
+    def post(self):
+        data_string = self.request.body
         data = json.loads(data_string)
-
         msgs = '\n\n'.join(data['msgs']) + '\n\n'
-
         resp, all_probs = predict(msgs, cnt=data.get('cnt', 32), input_skip_unk=data.get('input_skip_unk', None),
                                   first_sentence=data.get('first_sentence', False))
 
-        self.wfile.write(json.dumps({'predict': resp, 'probs': all_probs}).encode('utf_8'))
+        content = json.dumps({'predict': resp, 'probs': all_probs}).encode('utf_8')
+
+        self.set_header("Content-Type", "application/json")
+        self.set_header("Content-Length", int(len(content)))
+        self.write(content)
 
 
 if __name__ == '__main__':
@@ -155,5 +145,8 @@ if __name__ == '__main__':
         print('need port number')
         exit(1)
     (model, train_dataset) = torch.load('model.pkl', map_location=torch.device('cpu'))
-    httpd = HTTPServer(('', int(sys.argv[1])), S)
-    httpd.serve_forever()
+    app = tornado.web.Application([
+        (r"/", MainHandler),
+    ])
+    app.listen(int(sys.argv[1]))
+    tornado.ioloop.IOLoop.current().start()
