@@ -92,8 +92,9 @@ def sample_with_probs(model, x, steps, temperature=1.0, sample=False, top_k=None
         x = torch.cat((x, ix), dim=1)
 
         # update sentence prob
+        curr_newline = train_dataset.itos[ix.item()] == '\n'
         if prev_newline:
-            if train_dataset.itos[ix.item()] == '\n':
+            if curr_newline:
                 all_probs.append(current_prob)
                 if first_sentence:
                     if not early_terminate:
@@ -103,7 +104,7 @@ def sample_with_probs(model, x, steps, temperature=1.0, sample=False, top_k=None
                 current_prob = 1.0
             prev_newline = False
         else:
-            if train_dataset.itos[ix.item()] == '\n':
+            if curr_newline:
                 prev_newline = True
             current_prob *= probs[0][ix[0][0]].item()
 
@@ -114,7 +115,7 @@ def predict(msgs, cnt=32, input_skip_unk=False, first_sentence=False):
     context = jieba.lcut(msgs)
     x = [0 if s not in train_dataset.stoi else train_dataset.stoi[s] for s in context]
     if input_skip_unk:
-        x = list(filter(lambda x: x > 0, x))
+        x = list(filter(lambda x: x > 0, x)) # remove <unk>
     x = torch.tensor(x, dtype=torch.long)[None, ...]
     y, all_probs = sample_with_probs(model, x, cnt, temperature=0.9, sample=True, top_k=5,
                                      first_sentence=first_sentence)
@@ -125,10 +126,12 @@ def predict(msgs, cnt=32, input_skip_unk=False, first_sentence=False):
     return completion, all_probs
 
 
+# request handler
 class MainHandler(tornado.web.RequestHandler):
     def post(self):
         data_string = self.request.body
         data = json.loads(data_string)
+        # use \n\n as sentence separator
         msgs = '\n\n'.join(data['msgs']) + '\n\n'
         resp, all_probs = predict(msgs, cnt=data.get('cnt', 32), input_skip_unk=data.get('input_skip_unk', None),
                                   first_sentence=data.get('first_sentence', False))
